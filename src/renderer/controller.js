@@ -58,7 +58,7 @@ function render() {
       <div class="top-actions"><button class="btn ghost" data-action="undo" ${!game.undoStack.length?'disabled':''}>↶ 撤销 <small>Ctrl+Z</small></button><button class="btn ghost" data-action="redo" ${!game.redoStack.length?'disabled':''}>↷ 重做</button><button class="btn primary" data-action="show-overlay">打开比分牌窗口</button></div></header>
     <div class="layout"><aside class="sidebar"><div class="sidebar-title"><strong>比赛历史</strong><span>${state.games.length} 场</span></div><div class="game-list">
       ${state.games.map((item)=>`<button class="game-item ${item.id===game.id?'active':''}" data-action="activate-game" data-id="${item.id}"><span class="game-name">${esc(item.title)}</span><span class="game-meta"><span><i class="status-dot ${item.status}"></i>${item.status==='finished'?'已结束':'进行中'}</span><span>${dateLabel(item.updatedAt)}</span></span></button>`).join('')}
-      </div><div class="side-tools"><button class="btn primary wide" data-action="new-game">＋ 新建比赛</button><div class="row"><button class="btn wide" data-action="import">导入</button><button class="btn wide" data-action="export">备份</button></div><button class="btn ghost wide" data-action="data-folder">打开数据目录</button></div></aside>
+      </div><div class="side-tools"><button class="btn primary wide" data-action="new-game">＋ 新建比赛</button><div class="row"><button class="btn wide" data-action="import">导入</button><button class="btn wide" data-action="export">备份</button></div><button class="btn ghost wide" data-action="data-folder">打开数据目录</button><button class="btn ghost wide" data-action="log-folder">打开诊断日志</button></div></aside>
       <main class="content"><div class="page-head"><div><h1>${esc(game.title)}</h1><p>${esc(game.away.fullName)} vs ${esc(game.home.fullName)} · 计划 ${game.scheduledInnings} 局 · 实际赛程不受限制</p></div><span class="live-state ${game.syncPaused?'paused':''}">${game.syncPaused?'● 直播画面已锁定':'● 正在实时同步'}</span></div>
         <div class="grid">${game.syncPaused?`<div class="sync-banner"><span>当前修改尚未显示在直播比分牌上。</span><span class="row"><button class="btn ghost" data-action="discard">放弃修改</button><button class="btn warn" data-action="publish">发布到直播</button></span></div>`:''}
           <section class="stack"><article class="card"><div class="card-head"><strong>直播画面预览</strong><small>推荐输出尺寸 680 × 280</small></div><div class="preview-wrap">${preview(game, state.settings)}</div></article>
@@ -138,6 +138,7 @@ app.addEventListener('click', async (event) => {
   if(action==='export'){const result=await window.baseballAPI.exportData();if(result.ok)toast('备份已导出');return;}
   if(action==='import'){const result=await window.baseballAPI.importData();toast(result.ok?'备份已导入':result.message||'已取消导入');return;}
   if(action==='data-folder')return window.baseballAPI.openDataFolder();
+  if(action==='log-folder')return window.baseballAPI.openLogFolder();
 });
 
 app.addEventListener('change', async (event) => {

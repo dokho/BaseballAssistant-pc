@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const logger = require('./logger');
 const { LocalStore, DEFAULT_SETTINGS } = require('./storage');
 const { createGame, reduceGame, viewOf, clone } = require('./domain/game');
 
@@ -9,6 +10,30 @@ let overlayWindow;
 let store;
 
 app.setName('棒球比赛助手电脑版');
+
+let fatalErrorHandled = false;
+
+process.on('uncaughtException', (error) => {
+  logger.error('Unhandled main-process exception', error);
+  if (fatalErrorHandled) return;
+  fatalErrorHandled = true;
+  if (app.isReady()) {
+    dialog.showErrorBox('程序发生错误', '程序需要关闭。重启后可在“打开诊断日志”中找到日志文件并提供给技术支持。');
+  }
+  setTimeout(() => app.exit(1), 50).unref();
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled main-process promise rejection', reason);
+});
+
+app.on('render-process-gone', (_event, webContents, details) => {
+  logger.write('error', 'Renderer process gone', { window: webContents.getTitle(), details });
+});
+
+app.on('child-process-gone', (_event, details) => {
+  logger.write('error', 'Child process gone', details);
+});
 
 function createControllerWindow() {
   controllerWindow = new BrowserWindow({
@@ -106,9 +131,29 @@ function hydrateGame(game) {
 }
 
 function registerIpc() {
-  ipcMain.handle('app:get-state', () => stateForRenderer());
+  const handle = (channel, handler) => ipcMain.handle(channel, async (...args) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      logger.error(`IPC handler failed: ${channel}`, error);
+      throw error;
+    }
+  });
 
-  ipcMain.handle('game:dispatch', (_event, action) => {
+  ipcMain.on('diagnostics:renderer-error', (_event, payload = {}) => {
+    logger.write('error', 'Renderer error', {
+      kind: String(payload.kind || 'unknown').slice(0, 80),
+      message: String(payload.message || '').slice(0, 8000),
+      filename: String(payload.filename || '').slice(0, 1000),
+      line: Number(payload.line) || undefined,
+      column: Number(payload.column) || undefined,
+      stack: typeof payload.stack === 'string' ? payload.stack.slice(0, 8000) : undefined
+    });
+  });
+
+  handle('app:get-state', () => stateForRenderer());
+
+  handle('game:dispatch', (_event, action) => {
     const game = store.activeGame();
     if (!game) return stateForRenderer();
     reduceGame(game, action);
@@ -116,7 +161,7 @@ function registerIpc() {
     return stateForRenderer();
   });
 
-  ipcMain.handle('game:new', (_event, input) => {
+  handle('game:new', (_event, input) => {
     const game = createGame(input || {});
     store.data.games.unshift(game);
     store.data.activeGameId = game.id;
@@ -124,7 +169,7 @@ function registerIpc() {
     return stateForRenderer();
   });
 
-  ipcMain.handle('game:activate', (_event, gameId) => {
+  handle('game:activate', (_event, gameId) => {
     if (store.data.games.some((game) => game.id === gameId)) {
       store.data.activeGameId = gameId;
       persistAndBroadcast();
@@ -132,7 +177,7 @@ function registerIpc() {
     return stateForRenderer();
   });
 
-  ipcMain.handle('game:duplicate', (_event, gameId) => {
+  handle('game:duplicate', (_event, gameId) => {
     const source = store.data.games.find((game) => game.id === gameId);
     if (!source) return stateForRenderer();
     const game = createGame({
@@ -147,7 +192,7 @@ function registerIpc() {
     return stateForRenderer();
   });
 
-  ipcMain.handle('game:delete', (_event, gameId) => {
+  handle('game:delete', (_event, gameId) => {
     if (store.data.games.length <= 1) return { ok: false, message: '至少保留一场比赛。' };
     store.data.games = store.data.games.filter((game) => game.id !== gameId);
     if (store.data.activeGameId === gameId) store.data.activeGameId = store.data.games[0].id;
@@ -155,7 +200,7 @@ function registerIpc() {
     return { ok: true, state: stateForRenderer() };
   });
 
-  ipcMain.handle('data:export', async () => {
+  handle('data:export', async () => {
     const result = await dialog.showSaveDialog(controllerWindow, {
       title: '导出比赛数据备份',
       defaultPath: `棒球比赛助手备份-${new Date().toISOString().slice(0, 10)}.json`,
@@ -166,7 +211,7 @@ function registerIpc() {
     return { ok: true, filePath: result.filePath };
   });
 
-  ipcMain.handle('data:import', async () => {
+  handle('data:import', async () => {
     const result = await dialog.showOpenDialog(controllerWindow, {
       title: '导入比赛数据备份',
       properties: ['openFile'],
@@ -186,7 +231,7 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('overlay:command', (_event, command) => {
+  handle('overlay:command', (_event, command) => {
     if (!overlayWindow || overlayWindow.isDestroyed()) createOverlayWindow();
     if (command.type === 'show') overlayWindow.showInactive();
     if (command.type === 'focus') { overlayWindow.setIgnoreMouseEvents(false); overlayWindow.show(); overlayWindow.focus(); }
@@ -213,10 +258,16 @@ function registerIpc() {
     return stateForRenderer();
   });
 
-  ipcMain.handle('system:open-data-folder', () => shell.openPath(path.dirname(store.file)));
+  handle('system:open-data-folder', () => shell.openPath(path.dirname(store.file)));
+  handle('system:open-log-folder', () => {
+    fs.mkdirSync(logger.directory(), { recursive: true });
+    logger.write('info', 'Diagnostic log folder opened');
+    return shell.openPath(logger.directory());
+  });
 }
 
 app.whenReady().then(() => {
+  logger.start();
   store = new LocalStore(app.getPath('userData'));
   store.data.settings = { ...DEFAULT_SETTINGS, ...(store.data.settings || {}) };
   store.data.games.forEach(hydrateGame);
@@ -234,3 +285,5 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+app.on('will-quit', () => logger.write('info', 'Application session ended'));
