@@ -3,7 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const logger = require('./logger');
 const { LocalStore, DEFAULT_SETTINGS } = require('./storage');
-const { createGame, reduceGame, viewOf, clone } = require('./domain/game');
+const { createGame, reduceGame, viewOf, clone, ensureProfessionalGame, buildProfessionalStats } = require('./domain/game');
 
 let controllerWindow;
 let overlayWindow;
@@ -116,7 +116,8 @@ function stateForRenderer() {
       score: game.innings.reduce((sum, inning) => ({
         away: sum.away + inning.away,
         home: sum.home + inning.home
-      }), { away: 0, home: 0 })
+      }), { away: 0, home: 0 }),
+      professionalStats: buildProfessionalStats(game)
     }))
   };
 }
@@ -150,6 +151,7 @@ function hydrateGame(game) {
   game.innings ||= [{ number: 1, away: 0, home: 0 }];
   game.bases ||= [false, false, false];
   game.published ||= viewOf(game);
+  ensureProfessionalGame(game);
   return game;
 }
 
