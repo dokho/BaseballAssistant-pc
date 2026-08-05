@@ -8,6 +8,7 @@ const { createGame, reduceGame, viewOf, clone } = require('./domain/game');
 let controllerWindow;
 let overlayWindow;
 let store;
+let controllerCloseApproved = false;
 
 app.setName('棒球比赛助手电脑版');
 
@@ -36,6 +37,7 @@ app.on('child-process-gone', (_event, details) => {
 });
 
 function createControllerWindow() {
+  controllerCloseApproved = false;
   controllerWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -50,6 +52,27 @@ function createControllerWindow() {
     }
   });
   controllerWindow.loadFile(path.join(__dirname, 'renderer', 'controller.html'));
+  controllerWindow.on('close', async (event) => {
+    if (controllerCloseApproved) return;
+    event.preventDefault();
+    const result = await dialog.showMessageBox(controllerWindow, {
+      type: 'question',
+      buttons: ['关闭记录端和比分牌', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      title: '确认关闭程序',
+      message: '确定关闭记录端吗？',
+      detail: '关闭记录端会同时关闭直播比分牌窗口。'
+    });
+    if (result.response !== 0) {
+      logger.write('info', 'Controller close cancelled by user');
+      return;
+    }
+    controllerCloseApproved = true;
+    logger.write('info', 'Controller close confirmed by user');
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
+    if (controllerWindow && !controllerWindow.isDestroyed()) controllerWindow.close();
+  });
   controllerWindow.on('closed', () => { controllerWindow = null; });
 }
 
