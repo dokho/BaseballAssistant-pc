@@ -1,0 +1,7 @@
+node_modules/
+release/
+dist/
+*.log
+controller-preview*.png
+overlay-preview*.png
+.DS_Store

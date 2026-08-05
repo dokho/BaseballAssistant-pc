@@ -1,0 +1,60 @@
+{
+  "name": "baseball-game-assistant",
+  "version": "0.2.0",
+  "description": "棒球比赛助手电脑版 - 本地比赛记录与直播比分牌",
+  "main": "src/main.js",
+  "author": "ScoreBug",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis portable",
+    "dist:mac": "electron-builder --mac dmg zip --x64 --arm64"
+  },
+  "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "cn.scorebug.baseball-assistant",
+    "productName": "棒球比赛助手电脑版",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "BaseballAssistant-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.sports",
+      "icon": "assets/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "BaseballAssistant-${version}-mac-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "BaseballAssistant-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "棒球比赛助手电脑版"
+    },
+    "portable": {
+      "artifactName": "BaseballAssistant-Portable-${version}-${arch}.${ext}"
+    }
+  }
+}

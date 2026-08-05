@@ -1,0 +1,130 @@
+:root { color-scheme: dark; font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { display: block; padding: 0; user-select: none; }
+body.mode-green { background: #00ff00; }
+body.mode-solid { background: #07111f; }
+body.mode-transparent { background: transparent; }
+#scorebug { width: 100%; height: 100%; }
+
+.scoreboard {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 20% 61% 19%;
+  overflow: hidden;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 16px;
+  background: var(--overlay-background, #2857a6);
+  box-shadow: none;
+}
+.scoreboard-title {
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(14px, 2.2vw, 24px);
+  background: var(--overlay-background, #2857a6);
+  font-size: clamp(28px, 4.12vw, 34px);
+  font-weight: 900;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-app-region: drag;
+}
+.scoreboard-main {
+  display: grid;
+  grid-template-columns: minmax(280px, 2.7fr) minmax(62px, .4fr) minmax(150px, 1.05fr);
+  min-height: 0;
+}
+.scoreboard-teams { display: grid; grid-template-rows: 1fr 1fr; min-width: 0; }
+.scoreboard-team {
+  display: grid;
+  grid-template-columns: clamp(52px, 9.4vw, 68px) minmax(0, 1fr) clamp(52px, 8vw, 92px);
+  align-items: center;
+  gap: 10px;
+  padding: 0 clamp(14px, 2vw, 22px);
+}
+.scoreboard-team:not(.has-logo) { grid-template-columns: minmax(0, 1fr) clamp(52px, 8vw, 92px); }
+.team-logo { width: clamp(50px, 8.5vw, 64px); aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: rgba(0, 0, 0, .13); }
+.team-logo img { width: 112%; height: 112%; object-fit: contain; }
+.scoreboard-team:not(.has-logo) .team-logo { display: none; }
+.scoreboard-team.away { background: var(--away-team-background, #3d43c6); }
+.scoreboard-team.home { background: var(--home-team-background, #19b5e5); }
+.scoreboard-team-name {
+  min-width: 0;
+  font-size: clamp(23px, 5vw, 52px);
+  font-weight: 950;
+  letter-spacing: .035em;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scoreboard-score {
+  font-family: "Arial Black", Impact, sans-serif;
+  font-size: clamp(34px, 7vw, 76px);
+  line-height: .88;
+  text-align: right;
+}
+.inning-panel {
+  display: grid;
+  grid-template-rows: 1fr 1.25fr 1fr;
+  place-items: center;
+  background: var(--overlay-background, #2857a6);
+  font-family: Arial, sans-serif;
+  font-weight: 900;
+}
+.half-arrow { font-size: clamp(28px, 4.5vw, 46px); line-height: .9; }
+.half-arrow.active { color: #ed4b51; }
+.half-arrow.idle { color: #fff; }
+.inning-number { font-size: clamp(38px, 6vw, 62px); line-height: 1; }
+.bases-panel {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  background: #18242d;
+}
+.bases-diamond { position: relative; width: min(74%, 122px); aspect-ratio: 1; }
+.base {
+  position: absolute;
+  width: clamp(34px, 6.5vw, 48px);
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: #f7f9ff;
+  transform: rotate(45deg);
+  box-shadow: 0 2px 5px rgba(0,0,0,.16);
+}
+.base.on { background: #ffc928; box-shadow: 0 0 13px rgba(255, 201, 40, .32); }
+.base-1 { right: 0; bottom: 3px; }
+.base-2 { top: 7px; left: 50%; margin-left: calc(clamp(34px, 6.5vw, 48px) / -2); }
+.base-3 { left: 0; bottom: 3px; }
+.count-strip {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: end;
+  align-items: center;
+  gap: clamp(22px, 4vw, 44px);
+  padding: 0 clamp(16px, 2.5vw, 30px) 0 12px;
+  background: var(--overlay-background, #2857a6);
+}
+.count-group { display: flex; align-items: center; gap: clamp(8px, 1.2vw, 12px); }
+.count-label { font-size: clamp(25px, 4.6vw, 43px); font-weight: 950; line-height: 1; }
+.count-lamps { display: flex; gap: clamp(8px, 1.2vw, 12px); }
+.count-lamp {
+  width: clamp(18px, 3.2vw, 30px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #f7f9ff;
+}
+.count-lamp.ball.on { background: #177db9; }
+.count-lamp.strike.on { background: #ffca25; }
+.count-lamp.out.on { background: #ea4046; }
+.empty { padding: 28px; text-align: center; color: #fff; background: #07111f; border-radius: 16px; }
+
+@media (max-width: 510px) {
+  .scoreboard { border-radius: 11px; }
+  .scoreboard-main { grid-template-columns: minmax(190px, 2.5fr) 52px minmax(110px, .9fr); }
+  .scoreboard-team { padding: 0 10px; }
+  .count-strip { gap: 10px; padding: 0 9px; }
+}
