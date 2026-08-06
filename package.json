@@ -1,6 +1,6 @@
 {
   "name": "baseball-game-assistant",
-  "version": "0.3.0-beta.1",
+  "version": "0.3.0-beta.2",
   "description": "棒球比赛助手电脑版 - 本地比赛记录与直播比分牌",
   "main": "src/main.js",
   "author": "ScoreBug",

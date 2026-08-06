@@ -1,6 +1,8 @@
 let state;
 const app = document.querySelector('#app');
 const modalRoot = document.querySelector('#modal-root');
+let pendingScrollPositions = null;
+let scrollRestoreTimer = null;
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
 const activeGame = () => state?.games.find((game) => game.id === state.activeGameId);
@@ -72,6 +74,14 @@ function preview(game, settings) {
 }
 
 function render() {
+  const currentScrollPositions = {
+    content: app.querySelector('.content')?.scrollTop || 0,
+    history: app.querySelector('.game-list')?.scrollTop || 0
+  };
+  if (currentScrollPositions.content || currentScrollPositions.history) {
+    pendingScrollPositions = currentScrollPositions;
+  }
+  const scrollPositions = pendingScrollPositions || currentScrollPositions;
   const game = activeGame();
   if (!game) { app.innerHTML = '<div class="boot">暂无比赛</div>'; return; }
   const innings = [...game.innings].sort((a,b)=>a.number-b.number);
@@ -83,7 +93,7 @@ function render() {
       </div><div class="side-tools"><button class="btn primary wide" data-action="new-game">＋ 新建比赛</button><div class="row"><button class="btn wide" data-action="import">导入</button><button class="btn wide" data-action="export">备份</button></div><button class="btn ghost wide" data-action="data-folder">打开数据目录</button><button class="btn ghost wide" data-action="log-folder">打开诊断日志</button></div></aside>
       <main class="content"><div class="page-head"><div><h1>${esc(game.title)}</h1><p>${esc(game.away.fullName)} vs ${esc(game.home.fullName)} · 计划 ${game.scheduledInnings} 局 · 实际赛程不受限制</p></div><span class="live-state ${game.syncPaused?'paused':''}">${game.syncPaused?'● 直播画面已锁定':'● 正在实时同步'}</span></div>
         <div class="grid">${game.syncPaused?`<div class="sync-banner"><span>当前修改尚未显示在直播比分牌上。</span><span class="row"><button class="btn ghost" data-action="discard">放弃修改</button><button class="btn warn" data-action="publish">发布到直播</button></span></div>`:''}
-          <section class="stack"><article class="card"><div class="card-head"><strong>直播画面预览</strong><small>推荐输出尺寸 680 × 280</small></div><div class="preview-wrap">${preview(game, state.settings)}</div></article>
+          <section class="stack">${game.mode==='professional'?'':`<article class="card"><div class="card-head"><strong>直播画面预览</strong><small>推荐输出尺寸 680 × 280</small></div><div class="preview-wrap">${preview(game, state.settings)}</div></article>`}
             <article class="card"><div class="card-head"><strong>比分控制</strong><button class="btn ghost" data-action="edit-title">编辑比赛</button></div><div class="card-body team-controls">
               ${['away','home'].map((side)=>{const team=game[side];return `<div class="team-control"><div class="team-control-head"><span class="mini-logo">${logo(team)}</span><div><strong>${esc(team.shortName)}</strong><small>${side==='away'?'客队 · 上半局进攻':'主队 · 下半局进攻'}</small></div><button class="btn ghost" style="margin-left:auto" data-action="edit-team" data-side="${side}">编辑</button></div><div class="score-control"><button class="btn icon danger" data-action="run" data-side="${side}" data-delta="-1">−</button><strong>${game.score[side]}</strong><button class="btn icon green" data-action="run" data-side="${side}" data-delta="1">＋</button></div></div>`}).join('')}
             </div></article>
@@ -100,6 +110,20 @@ function render() {
             <article class="card"><div class="card-body"><div class="row"><button class="btn wide" data-action="duplicate">复制比赛</button><button class="btn wide ${game.status==='finished'?'green':'danger'}" data-action="toggle-finished">${game.status==='finished'?'恢复比赛':'结束比赛'}</button><button class="btn ghost" data-action="delete-game">删除</button></div></div></article>
           </aside>
         </div></main></div></div>`;
+  const restoreScroll = () => {
+    const content = app.querySelector('.content');
+    const history = app.querySelector('.game-list');
+    if (content) content.scrollTop = scrollPositions.content;
+    if (history) history.scrollTop = scrollPositions.history;
+  };
+  restoreScroll();
+  requestAnimationFrame(() => {
+    restoreScroll();
+    requestAnimationFrame(restoreScroll);
+    setTimeout(restoreScroll, 120);
+  });
+  clearTimeout(scrollRestoreTimer);
+  scrollRestoreTimer = setTimeout(() => { pendingScrollPositions = null; }, 400);
 }
 
 function modal({ title, body, confirmText='确认', danger=false, onConfirm }) {
