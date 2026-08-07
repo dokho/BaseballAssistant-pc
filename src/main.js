@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const logger = require('./logger');
 const { LocalStore, DEFAULT_SETTINGS } = require('./storage');
 const { createGame, reduceGame, viewOf, clone } = require('./domain/game');
+const { isTheme, normalizeTheme, getOverlayPresentation } = require('./renderer/theme');
 
 let controllerWindow;
 let overlayWindow;
@@ -78,11 +79,12 @@ function createControllerWindow() {
 
 function createOverlayWindow() {
   const settings = store.data.settings;
+  const presentation = getOverlayPresentation(settings.overlayTheme);
   overlayWindow = new BrowserWindow({
-    width: 680,
-    height: 280,
-    minWidth: 510,
-    minHeight: 210,
+    width: presentation.width,
+    height: presentation.height,
+    minWidth: presentation.minWidth,
+    minHeight: presentation.minHeight,
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -97,7 +99,7 @@ function createOverlayWindow() {
       nodeIntegration: false
     }
   });
-  overlayWindow.setAspectRatio(680 / 280);
+  overlayWindow.setAspectRatio(presentation.width / presentation.height);
   overlayWindow.setIgnoreMouseEvents(Boolean(settings.clickThrough), { forward: true });
   overlayWindow.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
   overlayWindow.once('ready-to-show', () => {
@@ -105,6 +107,14 @@ function createOverlayWindow() {
     sendOverlayState();
   });
   overlayWindow.on('closed', () => { overlayWindow = null; });
+}
+
+function applyOverlayPresentation() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const presentation = getOverlayPresentation(store.data.settings.overlayTheme);
+  overlayWindow.setMinimumSize(presentation.minWidth, presentation.minHeight);
+  overlayWindow.setAspectRatio(presentation.width / presentation.height);
+  overlayWindow.setBounds({ width: presentation.width, height: presentation.height });
 }
 
 function stateForRenderer() {
@@ -258,15 +268,18 @@ function registerIpc() {
     if (!overlayWindow || overlayWindow.isDestroyed()) createOverlayWindow();
     if (command.type === 'show') overlayWindow.showInactive();
     if (command.type === 'focus') { overlayWindow.setIgnoreMouseEvents(false); overlayWindow.show(); overlayWindow.focus(); }
-    if (command.type === 'reset-size') overlayWindow.setBounds({ width: 680, height: 280 });
+    if (command.type === 'reset-size') applyOverlayPresentation();
     if (command.type === 'mode') store.data.settings.overlayMode = command.value;
     if (command.type === 'settings') {
       const next = command.value || {};
       const validColor = (value) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
       if (validColor(next.overlayBackgroundColor)) store.data.settings.overlayBackgroundColor = next.overlayBackgroundColor;
+      const themeChanged = isTheme(next.overlayTheme) && next.overlayTheme !== store.data.settings.overlayTheme;
+      if (themeChanged) store.data.settings.overlayTheme = next.overlayTheme;
       if (validColor(next.awayTeamBackgroundColor)) store.data.settings.awayTeamBackgroundColor = next.awayTeamBackgroundColor;
       if (validColor(next.homeTeamBackgroundColor)) store.data.settings.homeTeamBackgroundColor = next.homeTeamBackgroundColor;
       if (typeof next.overlayTitle === 'string') store.data.settings.overlayTitle = next.overlayTitle.slice(0, 60);
+      if (themeChanged) applyOverlayPresentation();
     }
     if (command.type === 'always-on-top') {
       store.data.settings.overlayAlwaysOnTop = Boolean(command.value);
@@ -293,6 +306,7 @@ app.whenReady().then(() => {
   logger.start();
   store = new LocalStore(app.getPath('userData'));
   store.data.settings = { ...DEFAULT_SETTINGS, ...(store.data.settings || {}) };
+  store.data.settings.overlayTheme = normalizeTheme(store.data.settings.overlayTheme);
   store.data.games.forEach(hydrateGame);
   registerIpc();
   createControllerWindow();

@@ -4,6 +4,7 @@ const { createGame } = require('./domain/game');
 
 const DEFAULT_SETTINGS = {
   overlayMode: 'green',
+  overlayTheme: 'default',
   overlayAlwaysOnTop: true,
   clickThrough: false,
   overlayBackgroundColor: '#2857a6',

@@ -10,6 +10,19 @@ const dateLabel = (iso) => new Date(iso).toLocaleDateString('zh-CN', { month:'2-
 const logo = (team) => team.logo ? `<img src="${team.logo}" alt="" />` : esc((team.shortName || '?').slice(0, 2).toUpperCase());
 const lamps = (value, max, type) => Array.from({ length:max }, (_, i) => `<i class="lamp ${type} ${i < value ? 'on' : ''}"></i>`).join('');
 const overlayColor = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
+const selectedTheme = (settings) => window.scorebugTheme.normalizeTheme(settings.overlayTheme);
+const teamNameForTheme = (team, theme) => theme === 'future'
+  ? (team.fullName || team.shortName)
+  : (team.shortName || team.fullName);
+
+function themeSelector(settings) {
+  const current = selectedTheme(settings);
+  return window.scorebugTheme.themes.map((theme) => `
+    <button class="theme-choice ${current === theme.id ? 'active' : ''}" data-action="overlay-theme" data-value="${theme.id}" aria-pressed="${current === theme.id}">
+      <span class="theme-choice-copy"><strong>${esc(theme.label)}</strong><small>${esc(theme.description)}</small></span>
+      <span class="theme-choice-check" aria-hidden="true">${current === theme.id ? '已选' : '选择'}</span>
+    </button>`).join('');
+}
 
 function toast(message) {
   const node = document.createElement('div'); node.className = 'toast'; node.textContent = message;
@@ -22,15 +35,18 @@ function previewLamps(value, max, type) {
 
 function preview(game, settings) {
   const title = String(settings.overlayTitle || '').trim() || game.title || '棒球比赛';
+  const theme = selectedTheme(settings);
   const background = overlayColor(settings.overlayBackgroundColor, '#2857a6');
   const away = overlayColor(game.away.color, '#3d43c6');
   const home = overlayColor(game.home.color, '#19b5e5');
-  return `<div class="reference-preview" style="--overlay-background:${background};--away-team-background:${away};--home-team-background:${home}">
+  const awayName = teamNameForTheme(game.away, theme);
+  const homeName = teamNameForTheme(game.home, theme);
+  return `<div class="reference-preview theme-${theme}" data-theme="${theme}" style="--overlay-background:${background};--away-team-background:${away};--home-team-background:${home}">
     <div class="reference-title">${esc(title)}</div>
     <div class="reference-main">
       <div class="reference-teams">
-        <div class="reference-team away ${game.away.logo ? 'has-logo' : ''}"><span class="reference-team-logo">${game.away.logo ? `<img src="${game.away.logo}" alt="" />` : ''}</span><strong>${esc(game.away.shortName || game.away.fullName)}</strong><b>${game.score.away}</b></div>
-        <div class="reference-team home ${game.home.logo ? 'has-logo' : ''}"><span class="reference-team-logo">${game.home.logo ? `<img src="${game.home.logo}" alt="" />` : ''}</span><strong>${esc(game.home.shortName || game.home.fullName)}</strong><b>${game.score.home}</b></div>
+        <div class="reference-team away ${game.away.logo ? 'has-logo' : ''}"><span class="reference-team-logo">${game.away.logo ? `<img src="${game.away.logo}" alt="" />` : ''}</span><strong>${esc(awayName)}</strong><b>${game.score.away}</b></div>
+        <div class="reference-team home ${game.home.logo ? 'has-logo' : ''}"><span class="reference-team-logo">${game.home.logo ? `<img src="${game.home.logo}" alt="" />` : ''}</span><strong>${esc(homeName)}</strong><b>${game.score.home}</b></div>
       </div>
       <div class="reference-inning"><span class="${game.half==='top'?'active':''}">▲</span><b>${game.currentInning}</b><span class="${game.half==='bottom'?'active':''}">▼</span></div>
       <div class="reference-bases">
@@ -53,6 +69,7 @@ function render() {
   const game = activeGame();
   if (!game) { app.innerHTML = '<div class="boot">暂无比赛</div>'; return; }
   const innings = [...game.innings].sort((a,b)=>a.number-b.number);
+  const overlayPresentation = window.scorebugTheme.getOverlayPresentation(selectedTheme(state.settings));
   app.innerHTML = `<div class="shell">
     <header class="topbar"><div class="brand"><span class="brand-mark"></span><div class="brand-copy"><strong>棒球比赛助手电脑版</strong><span>LOCAL BROADCAST CONSOLE</span></div></div>
       <div class="top-actions"><button class="btn ghost" data-action="undo" ${!game.undoStack.length?'disabled':''}>↶ 撤销 <small>Ctrl+Z</small></button><button class="btn ghost" data-action="redo" ${!game.redoStack.length?'disabled':''}>↷ 重做</button><button class="btn primary" data-action="show-overlay">打开比分牌窗口</button></div></header>
@@ -61,7 +78,7 @@ function render() {
       </div><div class="side-tools"><button class="btn primary wide" data-action="new-game">＋ 新建比赛</button><div class="row"><button class="btn wide" data-action="import">导入</button><button class="btn wide" data-action="export">备份</button></div><button class="btn ghost wide" data-action="data-folder">打开数据目录</button><button class="btn ghost wide" data-action="log-folder">打开诊断日志</button></div></aside>
       <main class="content"><div class="page-head"><div><h1>${esc(game.title)}</h1><p>${esc(game.away.fullName)} vs ${esc(game.home.fullName)} · 计划 ${game.scheduledInnings} 局 · 实际赛程不受限制</p></div><span class="live-state ${game.syncPaused?'paused':''}">${game.syncPaused?'● 直播画面已锁定':'● 正在实时同步'}</span></div>
         <div class="grid">${game.syncPaused?`<div class="sync-banner"><span>当前修改尚未显示在直播比分牌上。</span><span class="row"><button class="btn ghost" data-action="discard">放弃修改</button><button class="btn warn" data-action="publish">发布到直播</button></span></div>`:''}
-          <section class="stack"><article class="card"><div class="card-head"><strong>直播画面预览</strong><small>推荐输出尺寸 680 × 280</small></div><div class="preview-wrap">${preview(game, state.settings)}</div></article>
+          <section class="stack"><article class="card"><div class="card-head"><strong>直播画面预览</strong><small>推荐输出尺寸 ${overlayPresentation.width} × ${overlayPresentation.height}</small></div><div class="preview-wrap">${preview(game, state.settings)}</div></article>
             <article class="card"><div class="card-head"><strong>比分控制</strong><button class="btn ghost" data-action="edit-title">编辑比赛</button></div><div class="card-body team-controls">
               ${['away','home'].map((side)=>{const team=game[side];return `<div class="team-control"><div class="team-control-head"><span class="mini-logo">${logo(team)}</span><div><strong>${esc(team.shortName)}</strong><small>${side==='away'?'客队 · 上半局进攻':'主队 · 下半局进攻'}</small></div><button class="btn ghost" style="margin-left:auto" data-action="edit-team" data-side="${side}">编辑</button></div><div class="score-control"><button class="btn icon danger" data-action="run" data-side="${side}" data-delta="-1">−</button><strong>${game.score[side]}</strong><button class="btn icon green" data-action="run" data-side="${side}" data-delta="1">＋</button></div></div>`}).join('')}
             </div></article>
@@ -73,7 +90,7 @@ function render() {
           </section>
           <aside class="stack"><article class="card"><div class="card-head"><strong>局面控制</strong><small>${game.half==='top'?esc(game.away.shortName):esc(game.home.shortName)} 进攻</small></div><div class="card-body"><div class="row" style="justify-content:space-between"><button class="btn icon" data-action="inning-step" data-delta="-1">−</button><b style="font-size:20px">第 ${game.currentInning} 局 · ${halfLabel(game)}</b><button class="btn icon" data-action="inning-step" data-delta="1">＋</button></div><div class="row" style="margin-top:11px"><button class="btn wide ${game.half==='top'?'primary':''}" data-action="set-half" data-half="top">上半局</button><button class="btn wide ${game.half==='bottom'?'primary':''}" data-action="set-half" data-half="bottom">下半局</button></div><button class="btn warn wide" style="margin-top:9px" data-action="end-half">确认结束当前半局</button></div></article>
             <article class="card"><div class="card-head"><strong>垒上情况</strong><button class="btn ghost" data-action="clear-bases">清空</button></div><div class="card-body base-panel"><div class="diamond big-diamond"><i class="base b1 ${game.bases[0]?'on':''}" data-action="toggle-base" data-index="0"></i><i class="base b2 ${game.bases[1]?'on':''}" data-action="toggle-base" data-index="1"></i><i class="base b3 ${game.bases[2]?'on':''}" data-action="toggle-base" data-index="2"></i></div><div class="base-actions">${['一垒','二垒','三垒'].map((label,index)=>`<button class="btn ${game.bases[index]?'warn':''}" data-action="toggle-base" data-index="${index}">${label}<br><small>${game.bases[index]?'有人':'空垒'}</small></button>`).join('')}<button class="btn ghost" data-action="walk">四坏保送</button></div></div></article>
-            <article class="card"><div class="card-head"><strong>直播输出</strong><small>OBS / 抖音 / 视频号</small></div><div class="card-body overlay-settings"><div><small style="color:var(--muted)">背景模式</small><div class="segmented" style="margin-top:7px">${[['green','绿幕'],['transparent','透明'],['solid','纯色']].map(([value,label])=>`<button class="${state.settings.overlayMode===value?'active':''}" data-action="overlay-mode" data-value="${value}">${label}</button>`).join('')}</div></div><div class="overlay-customization"><div class="field"><label>顶部比赛标题（留空时显示比赛名称）</label><input data-overlay-setting="overlayTitle" value="${esc(state.settings.overlayTitle || '')}" placeholder="例如：北京市青少年棒球锦标赛" maxlength="60" /></div><div class="color-settings"><div class="field"><label>比分牌背景</label><input class="color-input" data-overlay-setting="overlayBackgroundColor" type="color" value="${overlayColor(state.settings.overlayBackgroundColor, '#2857a6')}" /></div></div><p class="help">球队名称背景色请在“编辑客队/主队资料”中设置。</p></div><div class="switch-row"><span>窗口始终置顶</span><button class="switch ${state.settings.overlayAlwaysOnTop?'on':''}" data-action="always-on-top"></button></div><div class="switch-row"><span>鼠标穿透（开启时无法拖动）</span><button class="switch ${state.settings.clickThrough?'on':''}" data-action="click-through"></button></div><div class="row"><button class="btn wide" data-action="focus-overlay">定位窗口</button><button class="btn wide" data-action="reset-overlay">恢复 680×280</button></div><button class="btn ${game.syncPaused?'green':'warn'} wide" data-action="toggle-sync">${game.syncPaused?'发布并恢复同步':'暂停直播同步'}</button></div></article>
+            <article class="card"><div class="card-head"><strong>直播输出</strong><small>OBS / 抖音 / 视频号</small></div><div class="card-body overlay-settings"><div><small style="color:var(--muted)">比分牌主题</small><div class="theme-selector" style="margin-top:7px">${themeSelector(state.settings)}</div></div><div><small style="color:var(--muted)">背景模式</small><div class="segmented" style="margin-top:7px">${[['green','绿幕'],['transparent','透明'],['solid','纯色']].map(([value,label])=>`<button class="${state.settings.overlayMode===value?'active':''}" data-action="overlay-mode" data-value="${value}">${label}</button>`).join('')}</div></div><div class="overlay-customization"><div class="field"><label>顶部比赛标题（留空时显示比赛名称）</label><input data-overlay-setting="overlayTitle" value="${esc(state.settings.overlayTitle || '')}" placeholder="例如：北京市青少年棒球锦标赛" maxlength="60" /></div><div class="color-settings"><div class="field"><label>默认主题背景色</label><input class="color-input" data-overlay-setting="overlayBackgroundColor" type="color" value="${overlayColor(state.settings.overlayBackgroundColor, '#2857a6')}" /></div></div><p class="help">球队名称背景色请在“编辑客队/主队资料”中设置；现代、复古和 BSO 聚焦主题会保留球队颜色，并使用各自的框架配色。</p></div><div class="switch-row"><span>窗口始终置顶</span><button class="switch ${state.settings.overlayAlwaysOnTop?'on':''}" data-action="always-on-top"></button></div><div class="switch-row"><span>鼠标穿透（开启时无法拖动）</span><button class="switch ${state.settings.clickThrough?'on':''}" data-action="click-through"></button></div><div class="row"><button class="btn wide" data-action="focus-overlay">定位窗口</button><button class="btn wide" data-action="reset-overlay">恢复 ${overlayPresentation.width}×${overlayPresentation.height}</button></div><button class="btn ${game.syncPaused?'green':'warn'} wide" data-action="toggle-sync">${game.syncPaused?'发布并恢复同步':'暂停直播同步'}</button></div></article>
             <article class="card"><div class="card-head"><strong>操作记录</strong><small>最近 ${Math.min(500,game.events.length)} 条</small></div><div class="card-body event-list">${game.events.length?game.events.slice(0,30).map(e=>`<div class="event"><span class="event-time">${timeLabel(e.at)}</span><span>${esc(e.label)}</span><span class="event-inning">${e.inning}局${e.half==='top'?'上':'下'}</span></div>`).join(''):'<div class="empty-state">比赛操作将显示在这里</div>'}</div></article>
             <article class="card"><div class="card-body"><div class="row"><button class="btn wide" data-action="duplicate">复制比赛</button><button class="btn wide ${game.status==='finished'?'green':'danger'}" data-action="toggle-finished">${game.status==='finished'?'恢复比赛':'结束比赛'}</button><button class="btn ghost" data-action="delete-game">删除</button></div></div></article>
           </aside>
@@ -127,6 +144,7 @@ app.addEventListener('click', async (event) => {
   if(action==='show-overlay'){await window.baseballAPI.overlayCommand({type:'show'});return toast('比分牌窗口已打开');}
   if(action==='focus-overlay')return window.baseballAPI.overlayCommand({type:'focus'});
   if(action==='reset-overlay')return window.baseballAPI.overlayCommand({type:'reset-size'});
+  if(action==='overlay-theme'){state=await window.baseballAPI.overlayCommand({type:'settings',value:{overlayTheme:el.dataset.value}});return render();}
   if(action==='overlay-mode'){state=await window.baseballAPI.overlayCommand({type:'mode',value:el.dataset.value});return render();}
   if(action==='always-on-top'){state=await window.baseballAPI.overlayCommand({type:'always-on-top',value:!state.settings.overlayAlwaysOnTop});return render();}
   if(action==='click-through'){state=await window.baseballAPI.overlayCommand({type:'click-through',value:!state.settings.clickThrough});return render();}

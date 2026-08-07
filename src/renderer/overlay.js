@@ -15,12 +15,21 @@ function safeColor(value, fallback) {
   return /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
 }
 
+function teamNameForTheme(team, theme) {
+  return theme === 'future'
+    ? (team.fullName || team.shortName)
+    : (team.shortName || team.fullName);
+}
+
 function render(payload) {
   const { game, settings } = payload;
   document.body.className = `mode-${settings.overlayMode || 'green'}`;
   const root = document.querySelector('#scorebug');
   if (!game) { root.innerHTML = '<div class="empty">暂无比赛</div>'; return; }
   const title = String(settings.overlayTitle || '').trim() || game.title || '棒球比赛';
+  const theme = window.scorebugTheme.normalizeTheme(settings.overlayTheme);
+  const awayName = teamNameForTheme(game.away, theme);
+  const homeName = teamNameForTheme(game.home, theme);
   const colors = {
     background: safeColor(settings.overlayBackgroundColor, '#2857a6'),
     away: safeColor(game.away.color, '#3d43c6'),
@@ -28,18 +37,18 @@ function render(payload) {
   };
 
   root.innerHTML = `
-    <section class="scoreboard" aria-label="棒球直播比分牌" style="--overlay-background:${colors.background};--away-team-background:${colors.away};--home-team-background:${colors.home}">
+    <section class="scoreboard theme-${theme}" data-theme="${theme}" aria-label="棒球直播比分牌" style="--overlay-background:${colors.background};--away-team-background:${colors.away};--home-team-background:${colors.home}">
       <header class="scoreboard-title">${escapeHtml(title)}</header>
       <div class="scoreboard-main">
         <div class="scoreboard-teams">
           <div class="scoreboard-team away ${game.away.logo ? 'has-logo' : ''}">
             <span class="team-logo">${game.away.logo ? `<img src="${game.away.logo}" alt="" />` : ''}</span>
-            <span class="scoreboard-team-name">${escapeHtml(game.away.shortName || game.away.fullName)}</span>
+            <span class="scoreboard-team-name">${escapeHtml(awayName)}</span>
             <strong class="scoreboard-score">${game.score.away}</strong>
           </div>
           <div class="scoreboard-team home ${game.home.logo ? 'has-logo' : ''}">
             <span class="team-logo">${game.home.logo ? `<img src="${game.home.logo}" alt="" />` : ''}</span>
-            <span class="scoreboard-team-name">${escapeHtml(game.home.shortName || game.home.fullName)}</span>
+            <span class="scoreboard-team-name">${escapeHtml(homeName)}</span>
             <strong class="scoreboard-score">${game.score.home}</strong>
           </div>
         </div>
