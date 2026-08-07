@@ -221,7 +221,7 @@ body.mode-transparent { background: transparent; }
 .theme-future .team-logo { display: none; }
 .theme-future .scoreboard-team-name {
   font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
-  font-size: clamp(20px, 3.45vw, 48px);
+  font-size: clamp(23px, 4.2vw, 54px);
   font-weight: 850;
   letter-spacing: 0;
   text-overflow: ellipsis;
